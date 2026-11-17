@@ -1,61 +1,50 @@
 # ToDus Telegram Downloader — Codespaces + Render
 
-Proyecto Python para recibir un enlace `https://s3.todus.cu/...`, resolverlo con `todus-sdk==1.10.2`, descargar el archivo y enviarlo como documento por Telegram.
+Este proyecto recibe enlaces `https://s3.todus.cu/...`, los procesa con `todus-sdk==1.10.2` y devuelve el archivo como documento por Telegram.
 
-## Importante sobre el SDK
+## 1. Preparar la sesión ToDus mediante SMS (solo una vez)
 
-La documentación del SDK indica que `ToDusClient` es la variante stateless y que sus métodos reciben el token como primer argumento. La API de archivos documenta `get_real_download_url`, `download_file` y `download_file_to_folder`.
+La autenticación SMS se hace desde una terminal privada de GitHub Codespaces, no desde el chat de Telegram:
 
-Este proyecto usa:
-
-```python
-from todus import ToDusClient
-client = ToDusClient()
-client.download_file_to_folder(TODUS_TOKEN, url, folder, filename)
+```bash
+pip install -r requirements.txt
+python setup_auth.py
 ```
 
-La descarga real todavía debe probarse con un token y un enlace válidos. El proyecto no contiene credenciales.
+El programa pide tu número, solicita el SMS, recibe el PIN de forma oculta y guarda el token de sesión en `.env`. No escribas el PIN ni el token en el código ni en mensajes de chat. El archivo `.env` está excluido de Git.
 
-## 1. Abrir en GitHub Codespaces
+**Nota:** el flujo usa `ToDusClient2.request_code()`, `validate_code()` y `client.token` del SDK. Si la versión instalada no ofrece esos métodos o propiedades, el script se detiene sin guardar una credencial; no intenta métodos alternativos ni omite la confirmación SMS.
 
-1. Sube el contenido de este ZIP a un repositorio de GitHub.
-2. Abre el repositorio y pulsa **Code → Codespaces → Create codespace on main**.
-3. Codespaces detectará `.devcontainer/devcontainer.json` e instalará las dependencias.
-4. Configura los secretos en el entorno de Codespaces o crea un archivo `.env` a partir de `.env.example`.
-5. Ejecuta `python main.py`.
+## 2. Configurar Telegram
 
-### Variables necesarias
+- `TELEGRAM_BOT_TOKEN`: token creado con BotFather.
+- `TODUS_TOKEN`: token de sesión que `setup_auth.py` guarda en `.env`.
+- `ALLOWED_USER_IDS`: tu ID numérico de Telegram. Cuando el bot esté iniciado, envíale `/id`, copia el número y configúralo aquí.
+- `MAX_UPLOAD_MB`: límite de tamaño (por defecto 49 MB).
 
-- `TELEGRAM_BOT_TOKEN`: token entregado por BotFather.
-- `TODUS_TOKEN`: token de sesión de tu cuenta toDus.
-- `ALLOWED_USER_IDS`: tu ID numérico de Telegram. Puedes obtenerlo enviando `/id` al bot; mientras no lo añadas, el bot no aceptará enlaces.
-- `MAX_UPLOAD_MB`: límite del archivo que se intentará enviar a Telegram (por defecto 49 MB).
-- `PORT`: puerto del endpoint de salud (por defecto 8000).
+Para probar en Codespaces, crea `.env` a partir de `.env.example`, completa los valores y ejecuta:
 
-En Codespaces, puedes crear ` .env ` en la raíz con esas variables. El archivo está excluido por `.gitignore`; no lo subas al repositorio.
+```bash
+python main.py
+```
 
-## 2. Desplegar en Render cuando vuelva a estar disponible
+Puedes dejar `TODUS_TOKEN` en el `.env` local de Codespaces o guardarlo como secreto de Codespaces. Si el Codespace ya estaba abierto al crear el secreto, reinícialo.
 
-Este repositorio incluye `render.yaml` como Blueprint.
+## 3. Render
 
-1. En Render, crea un Blueprint desde el repositorio.
-2. Render detectará `render.yaml`.
-3. Añade los valores secretos `TELEGRAM_BOT_TOKEN`, `TODUS_TOKEN` y `ALLOWED_USER_IDS`.
-4. Usa el servicio web y los comandos ya definidos en el Blueprint.
+El archivo `render.yaml` deja preparados los comandos:
 
-Build command: `pip install -r requirements.txt`
+- Build: `pip install -r requirements.txt`
+- Start: `python main.py`
 
-Start command: `python main.py`
+Cuando Render esté disponible, crea el servicio desde el repositorio y añade en Environment las variables `TELEGRAM_BOT_TOKEN`, `TODUS_TOKEN` y `ALLOWED_USER_IDS`. Codespaces y Render tienen variables separadas: el `.env` de Codespaces no se copia automáticamente a Render.
 
-El servicio expone `/health`. En el plan gratuito de Render puede suspenderse por inactividad; el bot podría dejar de responder mientras esté suspendido. El disco del servicio también es efímero, pero los archivos descargados se guardan temporalmente y se borran después de enviarse.
+El plan gratuito puede suspender el servicio por inactividad. El endpoint `/health` responde para la comprobación del servicio.
 
-## Seguridad
+## Seguridad y límites
 
-- No pegues tus tokens en el código ni en el chat.
+- Nunca compartas el PIN SMS, el token de sesión ni el archivo `.env`.
 - No subas `.env` a GitHub.
-- Mantén `ALLOWED_USER_IDS` configurado para que otros usuarios no puedan usar tu bot.
-- Si un token se publica accidentalmente, renuévalo.
-
-## Limitación de Telegram
-
-El límite configurado es conservador (49 MB). El tamaño máximo permitido puede variar según la API y el método de alojamiento de Telegram.
+- Configura `ALLOWED_USER_IDS` para limitar el uso a tu cuenta.
+- Si una credencial se expone, revoca la sesión desde las opciones disponibles de ToDus y autentícate de nuevo.
+- La descarga real requiere una prueba con tu cuenta y un enlace válido. El proyecto no incluye credenciales ni puede garantizar la disponibilidad de los servidores de ToDus o Telegram.
