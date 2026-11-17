@@ -1,3 +1,0 @@
-todus-sdk==1.10.2
-python-telegram-bot>=22,<23
-python-dotenv>=1,<2
